@@ -30,6 +30,7 @@
 # JavaScript / Expo build output
 **/node_modules/
 **/dist/
+**/build/
 **/web-build/
 **/.cache/
 **/*.tsbuildinfo
