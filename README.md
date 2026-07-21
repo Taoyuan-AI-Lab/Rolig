@@ -1,12 +1,29 @@
 # Rolig
+
 Rolig is a cross-platform, TikTok-style app powered by GPT-5.6 and Codex that lets you endlessly scroll through curated memes, perfectly matching your daily vibe to bring instant joy to your life.
+
+## Mobile feed shell
+
+The Expo + React Native application lives in `frontend/`. It includes a
+NativeWind-styled, full-screen vertical meme feed with image/video playback and
+a three-item media prefetch window.
+
+```bash
+cd frontend
+npm install
+npm run typecheck
+npm run ios      # or: npm run android / npm run web
+```
+
+Copy `frontend/.env.example` to `frontend/.env` and set `EXPO_PUBLIC_API_URL`
+to the FastAPI deployment before starting the app. This is a public client
+value; all privileged credentials must remain in the backend host's encrypted
+environment.
 
 ## Backend
 
 The FastAPI service lives in `backend/`. Apply `backend/migrations/001_memes.sql` in
 Supabase, copy `backend/.env.example` to `backend/.env`, and fill in the service credentials.
-
-Run locally:
 
 ```bash
 cd backend
@@ -24,3 +41,8 @@ Primary routes:
 
 Set `AI_ANALYSIS_ENABLED=false` to run the feed without an OpenAI API key. In that mode,
 `POST /api/v1/memes` returns `503` because new uploads cannot be analyzed or embedded.
+
+## Validation
+
+Run `npm run typecheck` in `frontend/` and `ruff check . && pytest -q` in
+`backend/` before opening a pull request.
