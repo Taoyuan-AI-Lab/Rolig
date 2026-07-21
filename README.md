@@ -42,6 +42,17 @@ Primary routes:
 Set `AI_ANALYSIS_ENABLED=false` to run the feed without an OpenAI API key. In that mode,
 `POST /api/v1/memes` returns `503` because new uploads cannot be analyzed or embedded.
 
+### Render
+
+Configure the web service with `backend` as its root directory, use
+`pip install -r requirements.txt` as the build command, and start it with:
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port $PORT
+```
+
+The committed `.python-version` keeps production on the tested Python 3.12 runtime.
+
 ## Validation
 
 Run `npm run typecheck` in `frontend/` and `ruff check . && pytest -q` in
