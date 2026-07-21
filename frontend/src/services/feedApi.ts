@@ -32,23 +32,37 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function parseMeme(value: unknown): Meme {
   if (!isRecord(value)) throw new ApiError('The feed returned an invalid meme.');
 
-  const { id, score, tags, type, url } = value;
+  const { creatorId, id, likeCount, musicTitle, score, summary, tags, type, url, viewCount } =
+    value;
   const validTags = Array.isArray(tags) && tags.every((tag) => typeof tag === 'string');
 
   if (
     typeof id !== 'string' ||
+    typeof creatorId !== 'string' ||
     typeof url !== 'string' ||
     (type !== 'video' && type !== 'image') ||
     !validTags ||
     typeof score !== 'number' ||
     !Number.isFinite(score) ||
     score < 0 ||
-    score > 1
+    score > 1 ||
+    typeof summary !== 'string'
   ) {
     throw new ApiError('The feed returned an invalid meme.');
   }
 
-  return { id, url, type, tags, score };
+  return {
+    creatorId,
+    id,
+    likeCount: typeof likeCount === 'number' && likeCount >= 0 ? likeCount : 0,
+    musicTitle: typeof musicTitle === 'string' ? musicTitle : undefined,
+    score,
+    summary,
+    tags,
+    type,
+    url,
+    viewCount: typeof viewCount === 'number' && viewCount >= 0 ? viewCount : 0,
+  };
 }
 
 function parseFeedPage(value: unknown): FeedPage {

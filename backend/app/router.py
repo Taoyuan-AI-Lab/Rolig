@@ -153,9 +153,11 @@ async def get_client_feed(
     items = [
         ClientFeedItem(
             id=row["id"],
+            creator_id=row["creator_id"],
             url=str(row["media_url"]),
             type=row["media_type"],
             tags=row["tags"],
+            summary=row["summary"],
             score=normalize_feed_score(float(row["score"])),
         )
         for row in rows
