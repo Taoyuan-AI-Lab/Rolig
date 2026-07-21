@@ -3,6 +3,7 @@
 **/.env.*
 !**/.env.example
 !**/.env.template
+.local/
 **/secrets/
 **/*credentials*.json
 **/*service-account*.json
@@ -36,7 +37,9 @@
 # Python build output and virtual environments
 **/__pycache__/
 **/*.py[cod]
+**/*.egg-info/
 **/.pytest_cache/
+**/.ruff_cache/
 **/.mypy_cache/
 **/.venv/
 **/venv/
