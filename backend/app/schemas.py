@@ -114,9 +114,11 @@ class FeedResponse(APIModel):
 
 class ClientFeedItem(APIModel):
     id: UUID
+    creator_id: UUID = Field(serialization_alias="creatorId")
     url: str
     type: MediaType
     tags: list[str]
+    summary: str
     score: float = Field(ge=0, le=1)
 
 

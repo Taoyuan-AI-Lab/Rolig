@@ -9,9 +9,9 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { Meme } from '../types/meme';
+import { MemeInteractionOverlay } from './MemeInteractionOverlay';
 
 interface MemeCardProps {
   active: boolean;
@@ -78,8 +78,6 @@ function VideoMeme({ active, meme }: VideoMemeProps) {
 }
 
 export const MemeCard = memo(function MemeCard({ active, height, meme }: MemeCardProps) {
-  const insets = useSafeAreaInsets();
-
   return (
     <View className="relative overflow-hidden bg-black" style={{ height }}>
       {meme.type === 'image' ? (
@@ -95,25 +93,7 @@ export const MemeCard = memo(function MemeCard({ active, height, meme }: MemeCar
         <VideoMeme active={active} meme={meme} />
       )}
 
-      <View
-        pointerEvents="none"
-        className="absolute inset-x-0 bottom-0 bg-black/50 px-5 pb-7 pt-8"
-        style={{ paddingBottom: Math.max(insets.bottom, 20) }}
-      >
-        <View className="mb-3 flex-row flex-wrap gap-2">
-          {meme.tags.map((tag) => (
-            <View key={tag} className="rounded-full bg-white/15 px-3 py-1">
-              <Text className="text-xs font-semibold text-white">#{tag}</Text>
-            </View>
-          ))}
-        </View>
-        <View className="flex-row items-center justify-between">
-          <Text className="text-2xl font-black tracking-tight text-white">rolig.</Text>
-          <Text className="text-xs font-bold text-white/80">
-            {Math.round(meme.score * 100)}% match
-          </Text>
-        </View>
-      </View>
+      <MemeInteractionOverlay meme={meme} />
     </View>
   );
 });
