@@ -68,8 +68,10 @@ Upload routes accept a signed Supabase JWT from either `Authorization: Bearer <t
 the HTTP-only cookie named by `AUTH_COOKIE_NAME`. They derive creator ownership from the
 JWT `sub`; client creator IDs and object keys are rejected. Configure
 `SUPABASE_JWT_SECRET`, the R2 variables in `backend/.env.example`, and the upload
-rate/quota limits in Render. The managed `imageio-ffmpeg` dependency supplies the video
-transcoder unless `FFMPEG_BINARY` explicitly overrides it.
+rate/quota limits in Render. Set `UPLOAD_ALLOWED_USER_IDS` to a comma-separated
+list of authenticated Supabase user UUIDs permitted to use the demo upload flow;
+an empty list disables uploads. The managed `imageio-ffmpeg` dependency supplies
+the video transcoder unless `FFMPEG_BINARY` explicitly overrides it.
 
 ### Approved demo data
 

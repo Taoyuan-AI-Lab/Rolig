@@ -63,6 +63,7 @@ class R2Storage:
         *,
         object_key: str,
         content_type: str,
+        content_length: int,
         expires_in: int,
     ) -> str:
         async with self._client() as client:
@@ -72,6 +73,7 @@ class R2Storage:
                     "Bucket": self.quarantine_bucket_name,
                     "Key": object_key,
                     "ContentType": content_type,
+                    "ContentLength": content_length,
                 },
                 ExpiresIn=expires_in,
                 HttpMethod="PUT",

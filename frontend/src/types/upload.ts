@@ -19,7 +19,7 @@ export interface UploadAttribution {
 export interface UploadMedia {
   file?: File;
   fileName: string;
-  fileSize?: number;
+  fileSize: number;
   height: number;
   mediaType: MemeMediaType;
   mimeType: string;

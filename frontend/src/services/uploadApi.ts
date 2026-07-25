@@ -174,6 +174,9 @@ export async function uploadMediaToSession(
   signal?: AbortSignal,
 ): Promise<void> {
   const body = await loadMediaBody(media);
+  if (body.size !== media.fileSize) {
+    throw new UploadApiError('The selected file changed before it could be uploaded.');
+  }
 
   await new Promise<void>((resolve, reject) => {
     const request = new XMLHttpRequest();

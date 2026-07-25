@@ -19,6 +19,7 @@ from app.repository import (
     create_upload_session,
     get_upload_session,
     get_upload_usage,
+    reject_upload,
 )
 from app.upload_schemas import (
     UploadCompleteRequest,
@@ -113,6 +114,11 @@ async def presign_upload(
     storage: R2StorageDep,
     settings: SettingsDep,
 ) -> UploadPresignResponse:
+    if user.id not in settings.upload_allowed_user_ids:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="upload access is not enabled for this account",
+        )
     try:
         validate_upload_declaration(
             content_type=payload.content_type,
@@ -153,6 +159,7 @@ async def presign_upload(
         upload_url = await storage.create_put_url(
             object_key=object_key,
             content_type=payload.content_type,
+            content_length=payload.size_bytes,
             expires_in=settings.upload_url_ttl_seconds,
         )
         await create_upload_session(
@@ -184,6 +191,20 @@ async def presign_upload(
     )
 
 
+async def _reject_invalid_object(
+    *,
+    db: DatabaseDep,
+    storage: R2StorageDep,
+    upload_id: str,
+    object_key: str,
+) -> None:
+    try:
+        await storage.delete(object_key)
+    except Exception:
+        logger.warning("Could not delete rejected quarantine object", exc_info=True)
+    await reject_upload(db, upload_id=upload_id, message="Invalid media")
+
+
 @router.post("/{upload_id}/complete", response_model=UploadResult)
 async def complete_upload(
     upload_id: UploadIdPath,
@@ -203,7 +224,7 @@ async def complete_upload(
         return _result_from_row(row)
     if row["expires_at"] < datetime.now(UTC):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="upload session has expired",
         )
 
@@ -216,14 +237,20 @@ async def complete_upload(
         header = await storage.read_prefix(str(row["object_key"]))
         verify_signature_bytes(header, str(row["declared_content_type"]))
     except ValueError as exc:
+        await _reject_invalid_object(
+            db=db,
+            storage=storage,
+            upload_id=upload_id,
+            object_key=str(row["object_key"]),
+        )
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(exc),
         ) from exc
     except Exception as exc:
         logger.warning("Uploaded object verification failed", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="uploaded object could not be verified",
         ) from exc
 

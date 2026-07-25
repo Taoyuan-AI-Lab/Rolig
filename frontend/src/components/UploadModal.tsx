@@ -29,18 +29,13 @@ import {
   type UploadResult,
 } from '../types/upload';
 
-const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 75 * 1024 * 1024;
 const STATUS_POLL_ATTEMPTS = 15;
 const STATUS_POLL_INTERVAL_MS = 2_000;
 
-const SUPPORTED_IMAGE_TYPES = new Set(['image/gif', 'image/jpeg', 'image/png', 'image/webp']);
-const SUPPORTED_VIDEO_TYPES = new Set([
-  'video/mp4',
-  'video/quicktime',
-  'video/webm',
-  'video/x-m4v',
-]);
+const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const SUPPORTED_VIDEO_TYPES = new Set(['video/mp4', 'video/quicktime', 'video/webm']);
 
 type UploadStage =
   | 'form'
@@ -63,10 +58,8 @@ function inferMimeType(asset: ImagePicker.ImagePickerAsset): string {
   if (asset.mimeType) return asset.mimeType.toLowerCase();
   const extension = asset.fileName?.split('.').pop()?.toLowerCase();
   const inferred: Record<string, string> = {
-    gif: 'image/gif',
     jpeg: 'image/jpeg',
     jpg: 'image/jpeg',
-    m4v: 'video/x-m4v',
     mov: 'video/quicktime',
     mp4: 'video/mp4',
     png: 'image/png',
@@ -82,7 +75,7 @@ function normalizeMedia(asset: ImagePicker.ImagePickerAsset): UploadMedia {
   const isVideo = asset.type === 'video' || SUPPORTED_VIDEO_TYPES.has(mimeType);
 
   if ((!isImage && !isVideo) || !mimeType) {
-    throw new Error('Choose a JPEG, PNG, WebP, GIF, MP4, MOV, M4V, or WebM file.');
+    throw new Error('Choose a JPEG, PNG, WebP, MP4, MOV, or WebM file.');
   }
   if (isImage && !SUPPORTED_IMAGE_TYPES.has(mimeType)) {
     throw new Error('This image format is not supported.');
@@ -93,7 +86,10 @@ function normalizeMedia(asset: ImagePicker.ImagePickerAsset): UploadMedia {
 
   const mediaType = isVideo ? 'video' : 'image';
   const maxBytes = mediaType === 'video' ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
-  if (asset.fileSize != null && asset.fileSize > maxBytes) {
+  if (asset.fileSize == null || asset.fileSize <= 0) {
+    throw new Error('The selected file size could not be determined.');
+  }
+  if (asset.fileSize > maxBytes) {
     const maxMegabytes = Math.round(maxBytes / (1024 * 1024));
     throw new Error(`${mediaType === 'video' ? 'Videos' : 'Images'} must be under ${maxMegabytes} MB.`);
   }

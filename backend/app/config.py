@@ -1,5 +1,6 @@
 from functools import lru_cache
 from typing import Annotated
+from uuid import UUID
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -36,6 +37,7 @@ class Settings(BaseSettings):
     upload_quota_bytes: int = Field(default=1_073_741_824, ge=1)
     upload_image_max_bytes: int = Field(default=15_728_640, ge=1)
     upload_video_max_bytes: int = Field(default=209_715_200, ge=1)
+    upload_allowed_user_ids: Annotated[tuple[UUID, ...], NoDecode] = ()
     ffmpeg_binary: str | None = None
 
     @field_validator("media_allowed_hosts", mode="before")
@@ -43,6 +45,13 @@ class Settings(BaseSettings):
     def parse_hosts(cls, value: object) -> object:
         if isinstance(value, str):
             return tuple(host.strip().lower() for host in value.split(",") if host.strip())
+        return value
+
+    @field_validator("upload_allowed_user_ids", mode="before")
+    @classmethod
+    def parse_upload_allowed_user_ids(cls, value: object) -> object:
+        if isinstance(value, str):
+            return tuple(item.strip() for item in value.split(",") if item.strip())
         return value
 
 
