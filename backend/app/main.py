@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database import lifespan
 from app.router import feed_router
 from app.router import router as memes_router
+from app.upload_router import router as uploads_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
@@ -25,6 +26,7 @@ app.add_middleware(
 )
 app.include_router(memes_router, prefix="/api/v1")
 app.include_router(feed_router, prefix="/api/v1")
+app.include_router(uploads_router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["health"])

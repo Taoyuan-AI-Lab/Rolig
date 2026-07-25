@@ -7,6 +7,7 @@ from openai import AsyncOpenAI
 from redis.asyncio import Redis
 
 from app.config import get_settings
+from app.storage import R2Storage
 
 
 @asynccontextmanager
@@ -20,6 +21,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         statement_cache_size=0,
     )
     app.state.redis = Redis.from_url(settings.redis_url, decode_responses=True)
+    app.state.r2_storage = R2Storage.from_settings(settings)
     app.state.openai = None
     if settings.ai_analysis_enabled:
         if not settings.openai_api_key:

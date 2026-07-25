@@ -23,7 +23,15 @@
     },
     "plugins": [
       "expo-image",
-      "expo-video"
+      "expo-video",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Rolig uses your photo library only to select memes you choose to upload.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ]
     ]
   }
 }
