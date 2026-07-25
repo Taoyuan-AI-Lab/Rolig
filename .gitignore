@@ -44,3 +44,6 @@
 **/.mypy_cache/
 **/.venv/
 **/venv/
+
+# Approved demo media stays local; commit attribution manifests, not media binaries.
+backend/demo_data/assets/

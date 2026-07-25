@@ -120,6 +120,14 @@ class ClientFeedItem(APIModel):
     tags: list[str]
     summary: str
     score: float = Field(ge=0, le=1)
+    like_count: int = Field(default=0, ge=0, serialization_alias="likeCount")
+    view_count: int = Field(default=0, ge=0, serialization_alias="viewCount")
+    music_title: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        serialization_alias="musicTitle",
+    )
 
 
 class ClientFeedResponse(APIModel):

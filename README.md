@@ -28,8 +28,9 @@ until the backend has verified the uploaded object.
 
 ## Backend
 
-The FastAPI service lives in `backend/`. Apply `backend/migrations/001_memes.sql` in
-Supabase, copy `backend/.env.example` to `backend/.env`, and fill in the service credentials.
+The FastAPI service lives in `backend/`. Apply the SQL files in `backend/migrations/`
+to Supabase in numeric order, copy `backend/.env.example` to `backend/.env`, and fill
+in the service credentials.
 
 ```bash
 cd backend
@@ -47,6 +48,21 @@ Primary routes:
 
 Set `AI_ANALYSIS_ENABLED=false` to run the feed without an OpenAI API key. In that mode,
 `POST /api/v1/memes` returns `503` because new uploads cannot be analyzed or embedded.
+
+### Approved demo data
+
+The audited demo-data importer validates rights metadata, uploads approved image/video
+files to R2, verifies public byte-range delivery, creates idempotent Supabase records,
+and invalidates cached feeds. See `backend/demo_data/README.md` and start with a dry run:
+
+```bash
+cd backend
+python -m app.demo_data demo_data/manifest.json \
+  --assets-dir demo_data/assets \
+  --dry-run
+```
+
+Actual media under `backend/demo_data/assets/` is ignored and must never be pushed.
 
 ### Render
 

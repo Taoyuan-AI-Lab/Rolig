@@ -81,6 +81,9 @@ async def fetch_feed(
             m.tags,
             m.summary,
             m.humor_style,
+            m.like_count,
+            m.view_count,
+            m.music_title,
             COALESCE(s.score, 0)::double precision AS score,
             CASE
                 WHEN p.embedding IS NULL THEN NULL
