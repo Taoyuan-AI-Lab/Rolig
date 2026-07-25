@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "id": "018f6f4a-9255-7d24-a6c1-b3ee8d4e5111",
+      "creator_id": "018f6f4a-9255-7d24-a6c1-b3ee8d4e5222",
+      "file": "approved-example.jpg",
+      "media_type": "image",
+      "content_type": "image/jpeg",
+      "tags": [
+        "reaction",
+        "relatable"
+      ],
+      "summary": "Replace this with a literal description of the approved meme.",
+      "humor_style": "reaction",
+      "toxicity_score": 0,
+      "approved_for_demo": true,
+      "like_count": 0,
+      "view_count": 0,
+      "music_title": null,
+      "rights": {
+        "attribution_text": "Replace with the creator or rights holder credit.",
+        "source_url": "https://example.com/original-source",
+        "permission_basis": "direct_permission",
+        "permission_notes": "Replace with when and how demo usage was approved.",
+        "license_name": null,
+        "license_url": null
+      }
+    }
+  ]
+}

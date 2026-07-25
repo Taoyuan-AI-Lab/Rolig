@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "id": "0e9c27b5-7d0b-42a1-8886-9c46b6c96e07",
+      "creator_id": "215ca9d0-ed7b-41eb-be24-6e1774c31f95",
+      "file": "Haaland Is a Walking Meme.mp4",
+      "media_type": "video",
+      "content_type": "video/mp4",
+      "tags": [
+        "football",
+        "haaland",
+        "sports",
+        "reaction"
+      ],
+      "summary": "A football meme centered on Erling Haaland's memorable reactions and mannerisms.",
+      "humor_style": "sports reaction",
+      "toxicity_score": 0,
+      "approved_for_demo": true,
+      "like_count": 0,
+      "view_count": 0,
+      "music_title": null,
+      "object_key": "demo/haaland-is-a-walking-meme.mp4",
+      "rights": {
+        "attribution_text": "Rolig_official",
+        "source_url": "N/A",
+        "permission_basis": "original",
+        "permission_notes": "Original work by Rolig_official, approved by the project owner for the Rolig demo upload on 2026-07-25.",
+        "license_name": null,
+        "license_url": null
+      }
+    },
+    {
+      "id": "7d2f6a6f-9d17-420d-9408-6da388189c2b",
+      "creator_id": "215ca9d0-ed7b-41eb-be24-6e1774c31f95",
+      "file": "Ranking The Best Memes Recreated.mp4",
+      "media_type": "video",
+      "content_type": "video/mp4",
+      "tags": [
+        "ranking",
+        "recreated",
+        "memes",
+        "nostalgia"
+      ],
+      "summary": "A ranked compilation of recreated versions of recognizable memes.",
+      "humor_style": "ranking compilation",
+      "toxicity_score": 0,
+      "approved_for_demo": true,
+      "like_count": 0,
+      "view_count": 0,
+      "music_title": null,
+      "object_key": "demo/ranking-the-best-memes-recreated.mp4",
+      "rights": {
+        "attribution_text": "Rolig_official",
+        "source_url": "N/A",
+        "permission_basis": "original",
+        "permission_notes": "Original work by Rolig_official, approved by the project owner for the Rolig demo upload on 2026-07-25.",
+        "license_name": null,
+        "license_url": null
+      }
+    },
+    {
+      "id": "6b8738fa-0be6-4737-94da-ff1f6e466ec8",
+      "creator_id": "215ca9d0-ed7b-41eb-be24-6e1774c31f95",
+      "file": "Ranking the Best Old Memes.mp4",
+      "media_type": "video",
+      "content_type": "video/mp4",
+      "tags": [
+        "ranking",
+        "classic",
+        "memes",
+        "nostalgia"
+      ],
+      "summary": "A ranked look back at classic internet memes.",
+      "humor_style": "nostalgic ranking",
+      "toxicity_score": 0,
+      "approved_for_demo": true,
+      "like_count": 0,
+      "view_count": 0,
+      "music_title": null,
+      "object_key": "demo/ranking-the-best-old-memes.mp4",
+      "rights": {
+        "attribution_text": "Rolig_official",
+        "source_url": "N/A",
+        "permission_basis": "original",
+        "permission_notes": "Original work by Rolig_official, approved by the project owner for the Rolig demo upload on 2026-07-25.",
+        "license_name": null,
+        "license_url": null
+      }
+    }
+  ]
+}
