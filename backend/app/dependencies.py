@@ -6,6 +6,7 @@ from openai import AsyncOpenAI
 from redis.asyncio import Redis
 
 from app.config import Settings, get_settings
+from app.storage import R2Storage
 
 
 def get_db_pool(request: Request) -> asyncpg.Pool:
@@ -20,7 +21,12 @@ def get_openai(request: Request) -> AsyncOpenAI | None:
     return request.app.state.openai
 
 
+def get_r2_storage(request: Request) -> R2Storage:
+    return request.app.state.r2_storage
+
+
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 DatabaseDep = Annotated[asyncpg.Pool, Depends(get_db_pool)]
 RedisDep = Annotated[Redis, Depends(get_redis)]
 OpenAIDep = Annotated[AsyncOpenAI | None, Depends(get_openai)]
+R2StorageDep = Annotated[R2Storage, Depends(get_r2_storage)]
