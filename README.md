@@ -20,6 +20,12 @@ to the FastAPI deployment before starting the app. This is a public client
 value; all privileged credentials must remain in the backend host's encrypted
 environment.
 
+The feed includes a cross-platform upload modal for permitted meme media. Its
+presigned upload flow and backend security requirements are documented in
+[`frontend/UPLOAD_API_CONTRACT.md`](frontend/UPLOAD_API_CONTRACT.md). The client
+never stores R2 credentials and does not call the existing meme creation route
+until the backend has verified the uploaded object.
+
 ## Backend
 
 The FastAPI service lives in `backend/`. Apply `backend/migrations/001_memes.sql` in
