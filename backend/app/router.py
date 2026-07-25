@@ -167,7 +167,7 @@ async def get_client_feed(
         next_cursor=encode_feed_cursor(offset + len(items)) if has_more else None,
     )
     serialized = json.dumps(
-        response.model_dump(mode="json", by_alias=True),
+        response.model_dump(mode="json"),
         separators=(",", ":"),
     )
     try:

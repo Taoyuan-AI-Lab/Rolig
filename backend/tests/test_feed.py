@@ -72,6 +72,7 @@ async def test_feed_is_cached_as_json_array(monkeypatch) -> None:
 
 async def test_client_feed_uses_lookahead_for_exact_pagination(monkeypatch) -> None:
     creator_id = uuid4()
+    fetch_calls = 0
     rows = [
         {
             "id": uuid4(),
@@ -106,6 +107,8 @@ async def test_client_feed_uses_lookahead_for_exact_pagination(monkeypatch) -> N
     ]
 
     async def fake_fetch_feed(*args, **kwargs):
+        nonlocal fetch_calls
+        fetch_calls += 1
         assert kwargs["limit"] == 2
         return rows
 
@@ -134,6 +137,7 @@ async def test_client_feed_uses_lookahead_for_exact_pagination(monkeypatch) -> N
     assert first.next_cursor is not None
     assert first.items[0].like_count == 12
     assert second == first
+    assert fetch_calls == 1
 
 
 async def test_client_feed_returns_null_cursor_when_exhausted(monkeypatch) -> None:
