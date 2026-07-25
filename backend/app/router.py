@@ -130,16 +130,12 @@ async def get_client_feed(
     effective_user_id = user_id or UUID(int=0)
     weights = FeedWeights()
     cache_identity = f"client:{effective_user_id}:{offset}:{limit}"
-    cache_key = f"rolig:feed:v2:{hashlib.sha256(cache_identity.encode()).hexdigest()}"
+    cache_key = f"rolig:feed:v3:{hashlib.sha256(cache_identity.encode()).hexdigest()}"
 
     try:
         cached = await redis.get(cache_key)
         if cached is not None:
-            cached_items = [ClientFeedItem.model_validate(item) for item in json.loads(cached)]
-            next_cursor = encode_feed_cursor(offset + len(cached_items))
-            if len(cached_items) < limit:
-                next_cursor = None
-            return ClientFeedResponse(items=cached_items, next_cursor=next_cursor)
+            return ClientFeedResponse.model_validate(json.loads(cached))
     except (RedisError, json.JSONDecodeError, ValueError):
         logger.warning("Client feed cache read failed", exc_info=True)
 
@@ -147,9 +143,10 @@ async def get_client_feed(
         db,
         user_id=effective_user_id,
         weights=weights,
-        limit=limit,
+        limit=limit + 1,
         offset=offset,
     )
+    has_more = len(rows) > limit
     items = [
         ClientFeedItem(
             id=row["id"],
@@ -159,14 +156,23 @@ async def get_client_feed(
             tags=row["tags"],
             summary=row["summary"],
             score=normalize_feed_score(float(row["score"])),
+            like_count=int(row["like_count"]),
+            view_count=int(row["view_count"]),
+            music_title=row["music_title"],
         )
-        for row in rows
+        for row in rows[:limit]
     ]
-    serialized = json.dumps([item.model_dump(mode="json") for item in items], separators=(",", ":"))
+    response = ClientFeedResponse(
+        items=items,
+        next_cursor=encode_feed_cursor(offset + len(items)) if has_more else None,
+    )
+    serialized = json.dumps(
+        response.model_dump(mode="json", by_alias=True),
+        separators=(",", ":"),
+    )
     try:
         await redis.setex(cache_key, settings.feed_cache_ttl_seconds, serialized)
     except RedisError:
         logger.warning("Client feed cache write failed", exc_info=True)
 
-    next_cursor = encode_feed_cursor(offset + len(items)) if len(items) == limit else None
-    return ClientFeedResponse(items=items, next_cursor=next_cursor)
+    return response

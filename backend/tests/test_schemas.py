@@ -34,9 +34,15 @@ def test_client_feed_item_serializes_overlay_metadata() -> None:
         tags=["reaction"],
         summary="A surprised cat reacts to a Monday meeting.",
         score=0.82,
+        like_count=12,
+        view_count=345,
+        music_title="Demo Beat",
     )
 
     payload = item.model_dump(mode="json", by_alias=True)
 
     assert payload["creatorId"] == str(creator_id)
     assert payload["summary"] == "A surprised cat reacts to a Monday meeting."
+    assert payload["likeCount"] == 12
+    assert payload["viewCount"] == 345
+    assert payload["musicTitle"] == "Demo Beat"
