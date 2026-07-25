@@ -38,12 +38,22 @@ session rather than trusting a client-provided creator ID.
 
 The backend generates both `uploadId` and the R2 object key. The signed URL
 should expire within five minutes, permit only `PUT`, and be constrained to the
-declared object, content type, and content length when supported.
+declared object, content type, and content length.
+
+The shared client/server media policy is:
+
+- Images: `image/jpeg`, `image/png`, or `image/webp`, at most 15 MiB.
+- Videos: `video/mp4`, `video/quicktime`, or `video/webm`, at most 75 MiB from
+  the client. The backend may retain a higher administrative ceiling, but the
+  public client remains limited to 75 MiB.
+- GIF and `video/x-m4v` uploads are intentionally unsupported.
 
 ## 2. Upload bytes to R2
 
 The client sends the selected file directly to `uploadUrl` with `PUT` and the
-exact response `headers`. A successful R2 response can be any 2xx status.
+exact response `headers`. The request body length must exactly match
+`sizeBytes`; the signed URL binds that declared length. A successful R2
+response can be any 2xx status.
 
 This URL is sensitive while valid. Do not log its query string or return it
 from status endpoints.
@@ -103,11 +113,16 @@ allows the user to close the modal while processing continues.
 ## Required backend controls
 
 - Authenticate, authorize, rate-limit, and apply per-account storage quotas.
+- During the demo, restrict presigning to authenticated user UUIDs in the
+  backend `UPLOAD_ALLOWED_USER_IDS` allowlist. An empty allowlist disables
+  uploads.
 - Permit only the image/video MIME types and maximum sizes agreed with the
   client; verify file signatures because client validation is not authoritative.
 - Generate opaque object keys and never use an untrusted filename as an R2 key.
 - Keep pending and rejected uploads private and delete abandoned sessions with
   an R2 lifecycle rule.
+- Delete the quarantine object and reject the upload session when completion
+  detects a size, content-type, or media-signature mismatch.
 - Store attribution and permission evidence with the meme record.
 - Publish only after file validation and safety moderation both succeed.
 - Restrict R2 CORS to the deployed Rolig origins and required methods/headers.

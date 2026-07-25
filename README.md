@@ -45,9 +45,33 @@ Primary routes:
 - `GET /api/v1/memes/feed/{user_id}` ranks safe memes and caches the JSON item array in Redis.
 - `GET /api/v1/feed?cursor=<cursor>&limit=20` returns the mobile/web client contract with
   opaque pagination and a normalized score between 0 and 1.
+- `POST /api/v1/uploads/presign` creates an authenticated, five-minute R2 PUT URL.
+- `POST /api/v1/uploads/{upload_id}/complete` verifies and quarantines uploaded media.
+- `GET /api/v1/uploads/{upload_id}` returns uploader-scoped moderation status.
 
 Set `AI_ANALYSIS_ENABLED=false` to run the feed without an OpenAI API key. In that mode,
-`POST /api/v1/memes` returns `503` because new uploads cannot be analyzed or embedded.
+`POST /api/v1/memes` returns `503`, while secure uploads are sanitized and remain private
+with `processing` status until moderation is enabled. Unreviewed media is never published.
+
+### Secure upload deployment
+
+Apply `backend/migrations/003_secure_upload_pipeline.sql`, then create a private R2 bucket
+such as `rolig-media-quarantine`. Keep the existing `rolig-media` bucket as the public,
+moderation-approved destination. Set `R2_QUARANTINE_BUCKET_NAME` to the private bucket and
+do not enable its `r2.dev` URL or attach a public custom domain.
+
+The quarantine bucket CORS policy should allow `PUT` from the deployed Rolig origins with
+the `Content-Type` header. Add a lifecycle rule that deletes abandoned quarantine objects.
+The public bucket needs only cross-origin `GET`/`HEAD` for media playback.
+
+Upload routes accept a signed Supabase JWT from either `Authorization: Bearer <token>` or
+the HTTP-only cookie named by `AUTH_COOKIE_NAME`. They derive creator ownership from the
+JWT `sub`; client creator IDs and object keys are rejected. Configure
+`SUPABASE_JWT_SECRET`, the R2 variables in `backend/.env.example`, and the upload
+rate/quota limits in Render. Set `UPLOAD_ALLOWED_USER_IDS` to a comma-separated
+list of authenticated Supabase user UUIDs permitted to use the demo upload flow;
+an empty list disables uploads. The managed `imageio-ffmpeg` dependency supplies
+the video transcoder unless `FFMPEG_BINARY` explicitly overrides it.
 
 ### Approved demo data
 
