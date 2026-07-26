@@ -13,6 +13,7 @@ dependencies = [
     "openai>=1.99,<3",
     "pillow>=11.3,<13",
     "pydantic-settings>=2.10,<3",
+    "pyjwt[crypto]>=2.10,<3",
     "redis>=6.2,<7",
     "uvicorn[standard]>=0.35,<1",
 ]
@@ -29,7 +30,7 @@ include = ["app*"]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.4,<9",
+    "pytest>=9.0.3,<10",
     "pytest-asyncio>=1.1,<2",
     "ruff>=0.12,<1",
 ]

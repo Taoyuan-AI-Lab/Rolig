@@ -5,13 +5,18 @@ import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
+import { AuthButton } from './src/components/AuthButton';
+import { AuthModal } from './src/components/AuthModal';
 import { EmptyFeed, FeedError, FeedLoading } from './src/components/FeedState';
 import { MemeFeed } from './src/components/MemeFeed';
 import { UploadButton } from './src/components/UploadButton';
 import { UploadModal } from './src/components/UploadModal';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { useMemeFeed } from './src/hooks/useMemeFeed';
 
-export default function App() {
+function RoligApp() {
+  const { isLoading: isAuthLoading, session } = useAuth();
+  const [authVisible, setAuthVisible] = useState(false);
   const [uploadVisible, setUploadVisible] = useState(false);
   const {
     error,
@@ -50,7 +55,24 @@ export default function App() {
       <View className="flex-1 bg-black">
         <StatusBar hidden />
         {content}
-        <UploadButton onPress={() => setUploadVisible(true)} />
+        <AuthButton
+          isLoading={isAuthLoading}
+          isSignedIn={session !== null}
+          onPress={() => setAuthVisible(true)}
+        />
+        <UploadButton
+          onPress={() => {
+            if (session) {
+              setUploadVisible(true);
+            } else {
+              setAuthVisible(true);
+            }
+          }}
+        />
+        <AuthModal
+          onClose={() => setAuthVisible(false)}
+          visible={authVisible}
+        />
         <UploadModal
           onClose={() => setUploadVisible(false)}
           onPublished={() => void refresh()}
@@ -58,5 +80,13 @@ export default function App() {
         />
       </View>
     </SafeAreaProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <RoligApp />
+    </AuthProvider>
   );
 }

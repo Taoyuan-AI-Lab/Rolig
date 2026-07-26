@@ -15,16 +15,24 @@ npm run typecheck
 npm run ios      # or: npm run android / npm run web
 ```
 
-Copy `frontend/.env.example` to `frontend/.env` and set `EXPO_PUBLIC_API_URL`
-to the FastAPI deployment before starting the app. This is a public client
-value; all privileged credentials must remain in the backend host's encrypted
-environment.
+Copy `frontend/.env.example` to `frontend/.env` and set `EXPO_PUBLIC_API_URL`,
+`EXPO_PUBLIC_SUPABASE_URL`, and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` before
+starting the app. These are public client values. Never place a Supabase secret
+or service-role key, JWT signing secret, R2 credential, or OpenAI key in the
+frontend environment.
 
 The feed includes a cross-platform upload modal for permitted meme media. Its
 presigned upload flow and backend security requirements are documented in
 [`frontend/UPLOAD_API_CONTRACT.md`](frontend/UPLOAD_API_CONTRACT.md). The client
 never stores R2 credentials and does not call the existing meme creation route
 until the backend has verified the uploaded object.
+
+The account sheet supports Supabase email/password sign-in and registration.
+Native refresh sessions are encrypted with iOS Keychain or Android Keystore-backed
+SecureStore; web sessions use browser storage. Short-lived user access tokens are
+sent only as `Authorization: Bearer` headers to protected backend calls. To enable
+demo uploads, add the signed-in user's Supabase UUID to Render's
+`UPLOAD_ALLOWED_USER_IDS`.
 
 ## Backend
 
@@ -66,12 +74,14 @@ The public bucket needs only cross-origin `GET`/`HEAD` for media playback.
 
 Upload routes accept a signed Supabase JWT from either `Authorization: Bearer <token>` or
 the HTTP-only cookie named by `AUTH_COOKIE_NAME`. They derive creator ownership from the
-JWT `sub`; client creator IDs and object keys are rejected. Configure
-`SUPABASE_JWT_SECRET`, the R2 variables in `backend/.env.example`, and the upload
-rate/quota limits in Render. Set `UPLOAD_ALLOWED_USER_IDS` to a comma-separated
-list of authenticated Supabase user UUIDs permitted to use the demo upload flow;
-an empty list disables uploads. The managed `imageio-ffmpeg` dependency supplies
-the video transcoder unless `FFMPEG_BINARY` explicitly overrides it.
+verified JWT `sub`; client creator IDs and object keys are rejected. Configure the
+public `SUPABASE_URL`, the R2 variables in `backend/.env.example`, and the upload
+rate/quota limits in Render. The backend verifies ES256 access tokens against
+Supabase's cached public JWKS and never needs the legacy JWT signing secret. Set
+`UPLOAD_ALLOWED_USER_IDS` to a comma-separated list of authenticated Supabase user
+UUIDs permitted to use the demo upload flow; an empty list disables uploads. The
+managed `imageio-ffmpeg` dependency supplies the video transcoder unless
+`FFMPEG_BINARY` explicitly overrides it.
 
 ### Approved demo data
 
