@@ -2,7 +2,7 @@ from functools import lru_cache
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import AnyHttpUrl, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     ai_analysis_enabled: bool = False
     redis_url: str = Field(min_length=1)
-    supabase_jwt_secret: SecretStr = Field(min_length=32)
+    supabase_url: AnyHttpUrl
     auth_cookie_name: str = Field(default="rolig_session", min_length=1, max_length=64)
     openai_analysis_model: str = "gpt-5.6"
     openai_embedding_model: str = "text-embedding-3-small"
@@ -45,6 +45,17 @@ class Settings(BaseSettings):
     def parse_hosts(cls, value: object) -> object:
         if isinstance(value, str):
             return tuple(host.strip().lower() for host in value.split(",") if host.strip())
+        return value
+
+    @field_validator("supabase_url")
+    @classmethod
+    def validate_supabase_url(cls, value: AnyHttpUrl) -> AnyHttpUrl:
+        if value.scheme != "https":
+            raise ValueError("SUPABASE_URL must use HTTPS")
+        if value.username or value.password or value.query or value.fragment:
+            raise ValueError("SUPABASE_URL must be an HTTPS origin without credentials")
+        if value.path not in {"", "/"}:
+            raise ValueError("SUPABASE_URL must not contain a path")
         return value
 
     @field_validator("upload_allowed_user_ids", mode="before")

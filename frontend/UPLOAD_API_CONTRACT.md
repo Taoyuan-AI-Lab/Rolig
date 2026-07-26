@@ -4,11 +4,11 @@ The Rolig client uploads media with a short-lived, single-object URL. It never
 receives an R2 account token, Supabase service-role key, OpenAI key, or other
 privileged credential.
 
-All three endpoints below must require an authenticated Rolig session. Browser
-clients send the HTTP-only session cookie with `credentials: include`. When
-native authentication is added, the same API should accept its short-lived
-bearer session token. The backend must derive the uploader identity from that
-session rather than trusting a client-provided creator ID.
+All three endpoints below require an authenticated Rolig session. Native and web
+clients send the signed-in user's short-lived Supabase access token as
+`Authorization: Bearer <token>`; browser deployments may additionally support
+an HTTP-only session cookie. The backend derives uploader identity from the
+verified JWT `sub` instead of trusting a client-provided creator ID.
 
 ## 1. Create an upload session
 

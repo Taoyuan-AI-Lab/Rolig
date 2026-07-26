@@ -14,6 +14,7 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useAuth } from '../context/AuthContext';
 import {
   completeUploadSession,
   createUploadSession,
@@ -34,8 +35,16 @@ const MAX_VIDEO_BYTES = 75 * 1024 * 1024;
 const STATUS_POLL_ATTEMPTS = 15;
 const STATUS_POLL_INTERVAL_MS = 2_000;
 
-const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
-const SUPPORTED_VIDEO_TYPES = new Set(['video/mp4', 'video/quicktime', 'video/webm']);
+const SUPPORTED_IMAGE_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+]);
+const SUPPORTED_VIDEO_TYPES = new Set([
+  'video/mp4',
+  'video/quicktime',
+  'video/webm',
+]);
 
 type UploadStage =
   | 'form'
@@ -91,13 +100,16 @@ function normalizeMedia(asset: ImagePicker.ImagePickerAsset): UploadMedia {
   }
   if (asset.fileSize > maxBytes) {
     const maxMegabytes = Math.round(maxBytes / (1024 * 1024));
-    throw new Error(`${mediaType === 'video' ? 'Videos' : 'Images'} must be under ${maxMegabytes} MB.`);
+    throw new Error(
+      `${mediaType === 'video' ? 'Videos' : 'Images'} must be under ${maxMegabytes} MB.`,
+    );
   }
 
   const fallbackExtension = mediaType === 'video' ? 'mp4' : 'jpg';
   return {
     file: asset.file,
-    fileName: asset.fileName ?? `rolig-upload-${Date.now()}.${fallbackExtension}`,
+    fileName:
+      asset.fileName ?? `rolig-upload-${Date.now()}.${fallbackExtension}`,
     fileSize: asset.fileSize,
     height: asset.height,
     mediaType,
@@ -110,7 +122,9 @@ function normalizeMedia(asset: ImagePicker.ImagePickerAsset): UploadMedia {
 function formatBytes(value?: number): string {
   if (value == null) return 'Size checked by server';
   const megabytes = value / (1024 * 1024);
-  return megabytes < 1 ? `${Math.round(value / 1024)} KB` : `${megabytes.toFixed(1)} MB`;
+  return megabytes < 1
+    ? `${Math.round(value / 1024)} KB`
+    : `${megabytes.toFixed(1)} MB`;
 }
 
 function isHttpsUrl(value: string): boolean {
@@ -125,7 +139,13 @@ function delay(milliseconds: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 }
 
-function StageIndicator({ progress, stage }: { progress: number; stage: UploadStage }) {
+function StageIndicator({
+  progress,
+  stage,
+}: {
+  progress: number;
+  stage: UploadStage;
+}) {
   const labels: Partial<Record<UploadStage, string>> = {
     creating: 'Securing upload…',
     finalizing: 'Verifying media…',
@@ -143,15 +163,23 @@ function StageIndicator({ progress, stage }: { progress: number; stage: UploadSt
       </View>
       {stage === 'uploading' ? (
         <View className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/15">
-          <View className="h-full rounded-full bg-white" style={{ width: `${progress * 100}%` }} />
+          <View
+            className="h-full rounded-full bg-white"
+            style={{ width: `${progress * 100}%` }}
+          />
         </View>
       ) : null}
     </View>
   );
 }
 
-export function UploadModal({ onClose, onPublished, visible }: UploadModalProps) {
+export function UploadModal({
+  onClose,
+  onPublished,
+  visible,
+}: UploadModalProps) {
   const insets = useSafeAreaInsets();
+  const { getAccessToken } = useAuth();
   const requestRef = useRef<AbortController | null>(null);
   const [media, setMedia] = useState<UploadMedia | null>(null);
   const [creatorName, setCreatorName] = useState('');
@@ -208,7 +236,8 @@ export function UploadModal({ onClose, onPublished, visible }: UploadModalProps)
     setMessage(null);
     try {
       if (Platform.OS !== 'web') {
-        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        const permission =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (!permission.granted) {
           setMessage('Photo library permission is required to select a meme.');
           return;
@@ -227,19 +256,28 @@ export function UploadModal({ onClose, onPublished, visible }: UploadModalProps)
         setMedia(normalizeMedia(result.assets[0]));
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not open the media library.');
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Could not open the media library.',
+      );
     }
   };
 
   const waitForResult = async (
     initialResult: UploadResult,
+    accessToken: string,
     signal: AbortSignal,
   ): Promise<UploadResult> => {
     let result = initialResult;
-    for (let attempt = 0; result.status === 'processing' && attempt < STATUS_POLL_ATTEMPTS; attempt += 1) {
+    for (
+      let attempt = 0;
+      result.status === 'processing' && attempt < STATUS_POLL_ATTEMPTS;
+      attempt += 1
+    ) {
       await delay(STATUS_POLL_INTERVAL_MS);
       if (signal.aborted) throw new Error('Upload cancelled');
-      result = await fetchUploadStatus(result.uploadId, signal);
+      result = await fetchUploadStatus(result.uploadId, accessToken, signal);
     }
     return result;
   };
@@ -261,21 +299,36 @@ export function UploadModal({ onClose, onPublished, visible }: UploadModalProps)
     };
 
     try {
+      const accessToken = await getAccessToken();
       // The client receives only a short-lived, single-object URL. R2 account
       // credentials stay exclusively in the backend environment.
-      const session = await createUploadSession(media, controller.signal);
+      const session = await createUploadSession(
+        media,
+        accessToken,
+        controller.signal,
+      );
       setStage('uploading');
-      await uploadMediaToSession(media, session, setProgress, controller.signal);
+      await uploadMediaToSession(
+        media,
+        session,
+        setProgress,
+        controller.signal,
+      );
 
       setStage('finalizing');
       const initialResult = await completeUploadSession(
         session.uploadId,
         attribution,
+        accessToken,
         controller.signal,
       );
 
       setStage('processing');
-      const result = await waitForResult(initialResult, controller.signal);
+      const result = await waitForResult(
+        initialResult,
+        accessToken,
+        controller.signal,
+      );
       setMessage(result.message);
 
       if (result.status === 'ready') {
@@ -331,8 +384,12 @@ export function UploadModal({ onClose, onPublished, visible }: UploadModalProps)
 
           <View className="flex-row items-center justify-between px-5 pb-3">
             <View>
-              <Text className="text-2xl font-black text-white">Upload a meme</Text>
-              <Text className="mt-1 text-xs text-neutral-400">Private until safety review passes</Text>
+              <Text className="text-2xl font-black text-white">
+                Upload a meme
+              </Text>
+              <Text className="mt-1 text-xs text-neutral-400">
+                Private until safety review passes
+              </Text>
             </View>
             <Pressable
               accessibilityLabel="Close upload"
@@ -376,14 +433,18 @@ export function UploadModal({ onClose, onPublished, visible }: UploadModalProps)
                       className="rounded-full bg-white px-5 py-4 active:opacity-80"
                       onPress={restart}
                     >
-                      <Text className="text-center text-base font-black text-black">Try again</Text>
+                      <Text className="text-center text-base font-black text-black">
+                        Try again
+                      </Text>
                     </Pressable>
                   )}
                   <Pressable
                     className="rounded-full border border-white/15 px-5 py-4 active:opacity-80"
                     onPress={close}
                   >
-                    <Text className="text-center text-base font-bold text-white">Close</Text>
+                    <Text className="text-center text-base font-bold text-white">
+                      Close
+                    </Text>
                   </Pressable>
                 </View>
               </View>
@@ -397,21 +458,35 @@ export function UploadModal({ onClose, onPublished, visible }: UploadModalProps)
                   onPress={pickMedia}
                 >
                   {media?.mediaType === 'image' ? (
-                    <Image contentFit="cover" source={{ uri: media.uri }} style={{ height: '100%', width: '100%' }} />
+                    <Image
+                      contentFit="cover"
+                      source={{ uri: media.uri }}
+                      style={{ height: '100%', width: '100%' }}
+                    />
                   ) : (
                     <View className="flex-1 items-center justify-center p-6">
-                      <Text className="text-4xl text-white">{media ? '▶' : '+'}</Text>
+                      <Text className="text-4xl text-white">
+                        {media ? '▶' : '+'}
+                      </Text>
                       <Text className="mt-3 text-center text-sm font-bold text-white">
                         {media ? media.fileName : 'Choose an image or video'}
                       </Text>
-                      <Text className="mt-1 text-center text-xs text-neutral-400">{helperText}</Text>
+                      <Text className="mt-1 text-center text-xs text-neutral-400">
+                        {helperText}
+                      </Text>
                     </View>
                   )}
                 </Pressable>
 
                 {media?.mediaType === 'image' ? (
-                  <Pressable className="mt-2 self-center px-4 py-2" disabled={busy} onPress={pickMedia}>
-                    <Text className="text-sm font-bold text-white">Choose different media</Text>
+                  <Pressable
+                    className="mt-2 self-center px-4 py-2"
+                    disabled={busy}
+                    onPress={pickMedia}
+                  >
+                    <Text className="text-sm font-bold text-white">
+                      Choose different media
+                    </Text>
                   </Pressable>
                 ) : null}
 
@@ -441,7 +516,9 @@ export function UploadModal({ onClose, onPublished, visible }: UploadModalProps)
                   value={sourceUrl}
                 />
                 {sourceUrl.length > 0 && !isHttpsUrl(sourceUrl.trim()) ? (
-                  <Text className="mt-2 text-xs text-rose-400">Enter a complete HTTPS source URL.</Text>
+                  <Text className="mt-2 text-xs text-rose-400">
+                    Enter a complete HTTPS source URL.
+                  </Text>
                 ) : null}
 
                 <Text className="mb-2 mt-5 text-xs font-black uppercase tracking-widest text-neutral-400">
@@ -488,14 +565,19 @@ export function UploadModal({ onClose, onPublished, visible }: UploadModalProps)
                         : 'mr-3 h-6 w-6 rounded-md border border-white/30'
                     }
                   >
-                    {permissionConfirmed ? <Text className="font-black text-black">✓</Text> : null}
+                    {permissionConfirmed ? (
+                      <Text className="font-black text-black">✓</Text>
+                    ) : null}
                   </View>
                   <Text className="flex-1 text-sm leading-5 text-neutral-300">
-                    I confirm this upload is permitted and the attribution above is accurate.
+                    I confirm this upload is permitted and the attribution above
+                    is accurate.
                   </Text>
                 </Pressable>
 
-                {message ? <Text className="mt-4 text-sm text-rose-400">{message}</Text> : null}
+                {message ? (
+                  <Text className="mt-4 text-sm text-rose-400">{message}</Text>
+                ) : null}
                 <StageIndicator progress={progress} stage={stage} />
 
                 <Pressable
@@ -519,7 +601,8 @@ export function UploadModal({ onClose, onPublished, visible }: UploadModalProps)
                   </Text>
                 </Pressable>
                 <Text className="mt-3 text-center text-[11px] leading-4 text-neutral-500">
-                  Rolig validates the file again on the server. Uploads are not public until moderation succeeds.
+                  Rolig validates the file again on the server. Uploads are not
+                  public until moderation succeeds.
                 </Text>
               </>
             )}

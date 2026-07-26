@@ -1,6 +1,3 @@
-import base64
-import hashlib
-import hmac
 import json
 import time
 from contextlib import asynccontextmanager
@@ -9,14 +6,20 @@ from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
+import jwt
 import pytest
+from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi import BackgroundTasks, HTTPException
 from imageio_ffmpeg import get_ffmpeg_exe
+from jwt import PyJWK
+from jwt.algorithms import ECAlgorithm
+from jwt.exceptions import PyJWKClientError
 from PIL import Image
 from pydantic import ValidationError
 
 from app import upload_router
 from app.auth import AuthenticatedUser, verify_session_token
+from app.config import Settings
 from app.media_pipeline import (
     _run_process,
     sanitize_media,
@@ -27,57 +30,151 @@ from app.schemas import MediaType
 from app.storage import R2Storage, StoredObject
 from app.upload_schemas import UploadCompleteRequest, UploadPresignRequest
 
+TEST_ISSUER = "https://project-ref.supabase.co/auth/v1"
+TEST_PRIVATE_KEY = ec.generate_private_key(ec.SECP256R1())
+TEST_PUBLIC_JWK = json.loads(ECAlgorithm.to_jwk(TEST_PRIVATE_KEY.public_key()))
+TEST_PUBLIC_JWK.update({"alg": "ES256", "kid": "test-key", "use": "sig"})
 
-def _jwt(payload: dict[str, object], secret: str) -> str:
-    header = {"alg": "HS256", "typ": "JWT"}
 
-    def encode(value: object) -> str:
-        raw = json.dumps(value, separators=(",", ":")).encode()
-        return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+class StaticJwksClient:
+    def get_signing_key_from_jwt(self, token: str) -> PyJWK:
+        return PyJWK.from_dict(TEST_PUBLIC_JWK)
 
-    encoded_header = encode(header)
-    encoded_payload = encode(payload)
-    signature = hmac.new(
-        secret.encode(),
-        f"{encoded_header}.{encoded_payload}".encode(),
-        hashlib.sha256,
-    ).digest()
-    return (
-        f"{encoded_header}.{encoded_payload}."
-        f"{base64.urlsafe_b64encode(signature).decode().rstrip('=')}"
+
+def _settings(**overrides: object) -> Settings:
+    values: dict[str, object] = {
+        "database_url": "postgresql://database.example/rolig",
+        "r2_access_key_id": "test-access-key",
+        "r2_account_id": "test-account",
+        "r2_public_base_url": "https://media.example",
+        "r2_secret_access_key": "test-secret-key",
+        "redis_url": "rediss://redis.example",
+        "supabase_url": "https://project-ref.supabase.co",
+    }
+    values.update(overrides)
+    return Settings.model_validate(values)
+
+
+def _claims(**overrides: object) -> dict[str, object]:
+    claims: dict[str, object] = {
+        "aud": "authenticated",
+        "exp": int(time.time()) + 300,
+        "iss": TEST_ISSUER,
+        "role": "authenticated",
+        "sub": str(uuid4()),
+    }
+    claims.update(overrides)
+    return claims
+
+
+def _jwt(payload: dict[str, object]) -> str:
+    return jwt.encode(
+        payload,
+        TEST_PRIVATE_KEY,
+        algorithm="ES256",
+        headers={"kid": "test-key", "typ": "JWT"},
     )
 
 
-def test_session_token_uses_signed_subject_and_admin_claim() -> None:
+def test_session_token_uses_verified_subject_and_admin_claim() -> None:
     user_id = uuid4()
     token = _jwt(
-        {
-            "sub": str(user_id),
-            "exp": int(time.time()) + 300,
-            "role": "authenticated",
-            "app_metadata": {"role": "admin"},
-        },
-        "a-secure-test-secret-that-is-long-enough",
+        _claims(
+            sub=str(user_id),
+            app_metadata={"role": "admin"},
+        )
     )
 
-    user = verify_session_token(token, "a-secure-test-secret-that-is-long-enough")
+    user = verify_session_token(
+        token,
+        jwks_client=StaticJwksClient(),
+        issuer=TEST_ISSUER,
+    )
 
     assert user.id == user_id
     assert user.is_admin is True
 
 
 def test_session_token_rejects_tampering() -> None:
-    token = _jwt(
-        {
-            "sub": str(uuid4()),
-            "exp": int(time.time()) + 300,
-            "role": "authenticated",
-        },
+    token = _jwt(_claims())
+    header, payload, signature = token.split(".")
+    index = len(payload) // 2
+    replacement = "A" if payload[index] != "A" else "B"
+    tampered_payload = f"{payload[:index]}{replacement}{payload[index + 1 :]}"
+    tampered_token = f"{header}.{tampered_payload}.{signature}"
+
+    with pytest.raises(ValueError, match="invalid session token"):
+        verify_session_token(
+            tampered_token,
+            jwks_client=StaticJwksClient(),
+            issuer=TEST_ISSUER,
+        )
+
+
+@pytest.mark.parametrize(
+    "claims",
+    [
+        _claims(aud="another-application"),
+        _claims(exp=int(time.time()) - 1),
+        _claims(iss="https://attacker.example/auth/v1"),
+        _claims(role="service_role"),
+        _claims(sub="not-a-uuid"),
+    ],
+)
+def test_session_token_rejects_untrusted_claims(claims: dict[str, object]) -> None:
+    with pytest.raises(ValueError, match="invalid session token"):
+        verify_session_token(
+            _jwt(claims),
+            jwks_client=StaticJwksClient(),
+            issuer=TEST_ISSUER,
+        )
+
+
+def test_session_token_rejects_non_es256_algorithm() -> None:
+    token = jwt.encode(
+        _claims(),
         "a-secure-test-secret-that-is-long-enough",
+        algorithm="HS256",
+        headers={"kid": "test-key"},
     )
 
     with pytest.raises(ValueError, match="invalid session token"):
-        verify_session_token(f"{token[:-1]}x", "a-secure-test-secret-that-is-long-enough")
+        verify_session_token(
+            token,
+            jwks_client=StaticJwksClient(),
+            issuer=TEST_ISSUER,
+        )
+
+
+def test_session_token_rejects_unknown_signing_key() -> None:
+    class UnknownKeyClient:
+        def get_signing_key_from_jwt(self, token: str) -> PyJWK:
+            raise PyJWKClientError("unknown signing key")
+
+    with pytest.raises(ValueError, match="invalid session token"):
+        verify_session_token(
+            _jwt(_claims()),
+            jwks_client=UnknownKeyClient(),
+            issuer=TEST_ISSUER,
+        )
+
+
+@pytest.mark.parametrize(
+    "supabase_url",
+    [
+        "http://project-ref.supabase.co",
+        "https://user:password@project-ref.supabase.co",
+        "https://project-ref.supabase.co/rest/v1",
+        "https://project-ref.supabase.co?redirect=https://attacker.example",
+    ],
+)
+def test_supabase_url_requires_clean_https_origin(supabase_url: str) -> None:
+    with pytest.raises(ValidationError, match="SUPABASE_URL"):
+        _settings(supabase_url=supabase_url)
+
+
+def test_supabase_url_accepts_project_origin() -> None:
+    assert str(_settings().supabase_url) == "https://project-ref.supabase.co/"
 
 
 def test_presign_schema_does_not_accept_creator_or_object_key() -> None:

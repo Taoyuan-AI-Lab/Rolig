@@ -26,12 +26,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function parseHeaders(value: unknown): Record<string, string> {
   if (value == null) return {};
-  if (!isRecord(value)) throw new UploadApiError('The upload service returned invalid headers.');
+  if (!isRecord(value))
+    throw new UploadApiError('The upload service returned invalid headers.');
 
   const headers: Record<string, string> = {};
   for (const [name, headerValue] of Object.entries(value)) {
     if (typeof headerValue !== 'string') {
-      throw new UploadApiError('The upload service returned an invalid header.');
+      throw new UploadApiError(
+        'The upload service returned an invalid header.',
+      );
     }
     headers[name] = headerValue;
   }
@@ -100,6 +103,7 @@ async function readErrorMessage(response: Response): Promise<string | null> {
 async function apiRequest(
   path: string,
   init: RequestInit,
+  accessToken: string,
   signal?: AbortSignal,
 ): Promise<unknown> {
   const controller = new AbortController();
@@ -115,20 +119,25 @@ async function apiRequest(
         Accept: 'application/json',
         'Content-Type': 'application/json',
         ...init.headers,
+        Authorization: `Bearer ${accessToken}`,
       },
       signal: controller.signal,
     });
 
     if (!response.ok) {
       const detail = await readErrorMessage(response);
-      throw new UploadApiError(detail ?? 'The upload request failed.', response.status);
+      throw new UploadApiError(
+        detail ?? 'The upload request failed.',
+        response.status,
+      );
     }
 
     return await response.json();
   } catch (error) {
     if (error instanceof UploadApiError) throw error;
     if (controller.signal.aborted) {
-      if (signal?.aborted) throw new UploadApiError('The upload was cancelled.');
+      if (signal?.aborted)
+        throw new UploadApiError('The upload was cancelled.');
       throw new UploadApiError('The upload service took too long to respond.');
     }
     throw new UploadApiError('Unable to reach the upload service.');
@@ -140,6 +149,7 @@ async function apiRequest(
 
 export async function createUploadSession(
   media: UploadMedia,
+  accessToken: string,
   signal?: AbortSignal,
 ): Promise<UploadSession> {
   const value = await apiRequest(
@@ -153,6 +163,7 @@ export async function createUploadSession(
       }),
       method: 'POST',
     },
+    accessToken,
     signal,
   );
   return parseUploadSession(value);
@@ -162,7 +173,8 @@ function loadMediaBody(media: UploadMedia): Promise<Blob> {
   if (media.file) return Promise.resolve(media.file);
 
   return fetch(media.uri).then((response) => {
-    if (!response.ok) throw new UploadApiError('The selected media could not be read.');
+    if (!response.ok)
+      throw new UploadApiError('The selected media could not be read.');
     return response.blob();
   });
 }
@@ -175,7 +187,9 @@ export async function uploadMediaToSession(
 ): Promise<void> {
   const body = await loadMediaBody(media);
   if (body.size !== media.fileSize) {
-    throw new UploadApiError('The selected file changed before it could be uploaded.');
+    throw new UploadApiError(
+      'The selected file changed before it could be uploaded.',
+    );
   }
 
   await new Promise<void>((resolve, reject) => {
@@ -187,7 +201,11 @@ export async function uploadMediaToSession(
     for (const [name, value] of Object.entries(session.headers)) {
       request.setRequestHeader(name, value);
     }
-    if (!Object.keys(session.headers).some((name) => name.toLowerCase() === 'content-type')) {
+    if (
+      !Object.keys(session.headers).some(
+        (name) => name.toLowerCase() === 'content-type',
+      )
+    ) {
       request.setRequestHeader('Content-Type', media.mimeType);
     }
 
@@ -202,7 +220,9 @@ export async function uploadMediaToSession(
         onProgress(1);
         resolve();
       } else {
-        reject(new UploadApiError('R2 rejected the media upload.', request.status));
+        reject(
+          new UploadApiError('R2 rejected the media upload.', request.status),
+        );
       }
     };
     request.onerror = () => {
@@ -226,6 +246,7 @@ export async function uploadMediaToSession(
 export async function completeUploadSession(
   uploadId: string,
   attribution: UploadAttribution,
+  accessToken: string,
   signal?: AbortSignal,
 ): Promise<UploadResult> {
   const value = await apiRequest(
@@ -234,6 +255,7 @@ export async function completeUploadSession(
       body: JSON.stringify({ attribution }),
       method: 'POST',
     },
+    accessToken,
     signal,
   );
   return parseUploadResult(value);
@@ -241,11 +263,13 @@ export async function completeUploadSession(
 
 export async function fetchUploadStatus(
   uploadId: string,
+  accessToken: string,
   signal?: AbortSignal,
 ): Promise<UploadResult> {
   const value = await apiRequest(
     `/api/v1/uploads/${encodeURIComponent(uploadId)}`,
     { method: 'GET' },
+    accessToken,
     signal,
   );
   return parseUploadResult(value);
@@ -253,8 +277,11 @@ export async function fetchUploadStatus(
 
 export function getUploadErrorMessage(error: unknown): string {
   if (error instanceof UploadApiError) {
-    if (error.status === 401 || error.status === 403) {
-      return 'You must be signed in and allowed to upload memes.';
+    if (error.status === 401) {
+      return 'Your session could not be verified. Sign out and sign in again.';
+    }
+    if (error.status === 403) {
+      return error.message;
     }
     if (error.status === 404 || error.status === 501) {
       return 'The secure upload service is not available yet.';
