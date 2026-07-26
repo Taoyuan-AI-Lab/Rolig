@@ -37,31 +37,60 @@ export interface SupabasePublicConfig {
   url: string;
 }
 
-export function getSupabasePublicConfig(): SupabasePublicConfig {
-  if (!rawSupabaseUrl || !rawSupabasePublishableKey) {
+const SUPABASE_PUBLISHABLE_KEY_PATTERN =
+  /^sb_publishable_[A-Za-z0-9_-]{20,}$/;
+
+export function validateSupabasePublicConfig(
+  rawUrl: string | undefined,
+  rawPublishableKey: string | undefined,
+): SupabasePublicConfig {
+  if (!rawUrl || !rawPublishableKey) {
     throw new EnvironmentError(
       'Supabase authentication is not configured. Set the public Supabase URL and publishable key.',
     );
   }
 
-  const url = rawSupabaseUrl.trim().replace(/\/+$/, '');
-  const publishableKey = rawSupabasePublishableKey.trim();
+  const url = rawUrl.trim().replace(/\/+$/, '');
+  const publishableKey = rawPublishableKey.trim();
 
-  if (!url.startsWith('https://') || !url.endsWith('.supabase.co')) {
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
     throw new EnvironmentError(
       'EXPO_PUBLIC_SUPABASE_URL must be a Supabase HTTPS project URL.',
     );
   }
-  if (publishableKey.startsWith('sb_secret_')) {
+
+  if (
+    parsedUrl.protocol !== 'https:' ||
+    !parsedUrl.hostname.endsWith('.supabase.co') ||
+    parsedUrl.username !== '' ||
+    parsedUrl.password !== '' ||
+    (parsedUrl.pathname !== '' && parsedUrl.pathname !== '/') ||
+    parsedUrl.search !== '' ||
+    parsedUrl.hash !== ''
+  ) {
     throw new EnvironmentError(
-      'A Supabase secret key must never be embedded in the client.',
+      'EXPO_PUBLIC_SUPABASE_URL must be a Supabase HTTPS project URL.',
     );
   }
-  if (publishableKey.length < 20) {
+
+  // Only the modern public client-key format is accepted. Rejecting every
+  // legacy JWT format prevents a service_role token from being accidentally
+  // bundled into the public Expo application.
+  if (!SUPABASE_PUBLISHABLE_KEY_PATTERN.test(publishableKey)) {
     throw new EnvironmentError(
-      'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY is invalid.',
+      'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY must be an sb_publishable_ key.',
     );
   }
 
   return { publishableKey, url };
+}
+
+export function getSupabasePublicConfig(): SupabasePublicConfig {
+  return validateSupabasePublicConfig(
+    rawSupabaseUrl,
+    rawSupabasePublishableKey,
+  );
 }
