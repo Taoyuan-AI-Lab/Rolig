@@ -1,3 +1,4 @@
+import asyncio
 import json
 import time
 from contextlib import asynccontextmanager
@@ -17,7 +18,7 @@ from jwt.exceptions import PyJWKClientError
 from PIL import Image
 from pydantic import ValidationError
 
-from app import upload_router
+from app import media_pipeline, upload_router
 from app.auth import AuthenticatedUser, verify_session_token
 from app.config import Settings
 from app.media_pipeline import (
@@ -302,6 +303,77 @@ async def test_video_processing_outputs_streaming_mp4_and_frame(tmp_path: Path) 
     assert processed.content_type == "video/mp4"
     assert processed.media_path.read_bytes()[4:8] == b"ftyp"
     assert processed.analysis_path.stat().st_size > 0
+
+
+async def test_video_processing_command_bounds_memory_and_dimensions(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    calls: list[tuple[str, ...]] = []
+
+    async def fake_run_process(*args: str, max_seconds: float = 300) -> bytes:
+        calls.append(args)
+        await asyncio.to_thread(Path(args[-1]).write_bytes, b"\x00\x00\x00\x18ftyp")
+        return b""
+
+    monkeypatch.setattr(media_pipeline, "_run_process", fake_run_process)
+    await media_pipeline._sanitize_video(
+        tmp_path / "source.mp4",
+        tmp_path / "sanitized.mp4",
+        tmp_path / "analysis.jpg",
+        ffmpeg_binary="ffmpeg",
+    )
+
+    transcode = calls[0]
+    assert transcode[transcode.index("-max_alloc") + 1] == str(64 * 1024 * 1024)
+    assert transcode[transcode.index("-filter_threads") + 1] == "1"
+    assert all(
+        transcode[index + 1] == "1" for index, value in enumerate(transcode) if value == "-threads"
+    )
+    scale_filter = transcode[transcode.index("-vf") + 1]
+    assert "min(1280,iw)" in scale_filter
+    assert "min(1280,ih)" in scale_filter
+    assert transcode[transcode.index("-preset") + 1] == "ultrafast"
+    assert transcode[transcode.index("-tune") + 1] == "zerolatency"
+
+
+async def test_video_processing_serializes_transcodes(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    active = 0
+    maximum_active = 0
+
+    async def fake_sanitize_video(
+        source: Path,
+        destination: Path,
+        analysis_path: Path,
+        *,
+        ffmpeg_binary: str,
+    ) -> None:
+        nonlocal active, maximum_active
+        active += 1
+        maximum_active = max(maximum_active, active)
+        await asyncio.sleep(0.01)
+        active -= 1
+
+    monkeypatch.setattr(media_pipeline, "_sanitize_video", fake_sanitize_video)
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"\x00\x00\x00\x18ftyp")
+
+    await asyncio.gather(
+        *(
+            sanitize_media(
+                source,
+                media_type="video",
+                ffmpeg_binary="ffmpeg",
+                work_dir=tmp_path / f"work-{index}",
+            )
+            for index in range(2)
+        )
+    )
+
+    assert maximum_active == 1
 
 
 async def test_presign_generates_opaque_server_key(monkeypatch) -> None:
