@@ -21,6 +21,10 @@ from app.upload_schemas import UploadAttribution
 
 logger = logging.getLogger(__name__)
 
+_VIDEO_TRANSCODE_SEMAPHORE = asyncio.Semaphore(1)
+_FFMPEG_MAX_ALLOCATION_BYTES = 64 * 1024 * 1024
+_VIDEO_MAX_DIMENSION = 1280
+
 
 ALLOWED_MEDIA: dict[str, tuple[str, int]] = {
     "image/jpeg": ("image", 15_728_640),
@@ -136,17 +140,43 @@ async def _sanitize_video(
     await _run_process(
         ffmpeg_binary,
         "-nostdin",
+        "-loglevel",
+        "error",
+        "-max_alloc",
+        str(_FFMPEG_MAX_ALLOCATION_BYTES),
+        "-filter_threads",
+        "1",
+        "-filter_complex_threads",
+        "1",
+        "-threads",
+        "1",
         "-y",
         "-i",
         str(source),
+        "-map",
+        "0:v:0",
+        "-map",
+        "0:a:0?",
+        "-sn",
+        "-dn",
         "-map_metadata",
         "-1",
         "-map_chapters",
         "-1",
+        "-vf",
+        (
+            f"scale=w='min({_VIDEO_MAX_DIMENSION},iw)':"
+            f"h='min({_VIDEO_MAX_DIMENSION},ih)':"
+            "force_original_aspect_ratio=decrease:force_divisible_by=2"
+        ),
         "-c:v",
         "libx264",
         "-preset",
-        "veryfast",
+        "ultrafast",
+        "-tune",
+        "zerolatency",
+        "-threads",
+        "1",
         "-crf",
         "23",
         "-pix_fmt",
@@ -162,11 +192,21 @@ async def _sanitize_video(
     await _run_process(
         ffmpeg_binary,
         "-nostdin",
+        "-loglevel",
+        "error",
+        "-max_alloc",
+        str(_FFMPEG_MAX_ALLOCATION_BYTES),
+        "-filter_threads",
+        "1",
+        "-threads",
+        "1",
         "-y",
         "-ss",
         "1",
         "-i",
         str(destination),
+        "-map",
+        "0:v:0",
         "-frames:v",
         "1",
         "-vf",
@@ -201,12 +241,16 @@ async def sanitize_media(
         return ProcessedMedia(final_path, content_type, extension, analysis_path)
 
     destination = work_dir / "sanitized.mp4"
-    await _sanitize_video(
-        source,
-        destination,
-        analysis_path,
-        ffmpeg_binary=ffmpeg_binary,
-    )
+    # FastAPI background tasks share the web-service process. Serializing
+    # FFmpeg prevents concurrent uploads from multiplying decoder/encoder
+    # memory on small instances.
+    async with _VIDEO_TRANSCODE_SEMAPHORE:
+        await _sanitize_video(
+            source,
+            destination,
+            analysis_path,
+            ffmpeg_binary=ffmpeg_binary,
+        )
     return ProcessedMedia(destination, "video/mp4", "mp4", analysis_path)
 
 
@@ -240,10 +284,7 @@ async def process_upload(
             processed = await sanitize_media(
                 source_path,
                 media_type=str(upload["media_type"]),
-                ffmpeg_binary=(
-                    settings.ffmpeg_binary
-                    or await asyncio.to_thread(get_ffmpeg_exe)
-                ),
+                ffmpeg_binary=(settings.ffmpeg_binary or await asyncio.to_thread(get_ffmpeg_exe)),
                 work_dir=work_dir,
             )
             token = secrets.token_urlsafe(24)
