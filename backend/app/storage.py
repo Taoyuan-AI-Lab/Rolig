@@ -66,6 +66,8 @@ class R2Storage:
         content_length: int,
         expires_in: int,
     ) -> str:
+        if content_length <= 0:
+            raise ValueError("content length must be positive")
         async with self._client() as client:
             return await client.generate_presigned_url(
                 "put_object",
@@ -73,7 +75,6 @@ class R2Storage:
                     "Bucket": self.quarantine_bucket_name,
                     "Key": object_key,
                     "ContentType": content_type,
-                    "ContentLength": content_length,
                 },
                 ExpiresIn=expires_in,
                 HttpMethod="PUT",

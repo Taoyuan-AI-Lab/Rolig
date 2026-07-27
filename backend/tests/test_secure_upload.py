@@ -218,7 +218,7 @@ def test_signature_verification_rejects_spoofed_media() -> None:
         verify_signature_bytes(b"<script>alert(1)", "image/png")
 
 
-async def test_presigned_put_binds_declared_content_length() -> None:
+async def test_presigned_put_does_not_require_client_controlled_content_length() -> None:
     captured: dict[str, object] = {}
 
     class FakeClient:
@@ -251,7 +251,11 @@ async def test_presigned_put_binds_declared_content_length() -> None:
     params = captured["Params"]
     assert isinstance(params, dict)
     assert params["Bucket"] == "private"
-    assert params["ContentLength"] == 1234
+    assert params["ContentType"] == "video/mp4"
+    # Browsers and React Native control Content-Length themselves and cannot
+    # reliably reproduce it as a signed header. The completion endpoint reads
+    # the object metadata and rejects/deletes any declared-size mismatch.
+    assert "ContentLength" not in params
 
 
 async def test_image_processing_strips_metadata(tmp_path: Path) -> None:
