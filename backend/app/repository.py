@@ -43,7 +43,7 @@ async def create_upload_session(
     async with pool.acquire() as connection, connection.transaction():
         await connection.execute(
             "SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))",
-            uploader_id,
+            str(uploader_id),
         )
         usage = await connection.fetchval(
             """
