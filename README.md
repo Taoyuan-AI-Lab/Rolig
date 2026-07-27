@@ -1,5 +1,7 @@
 <div align="center">
-  <img src="frontend/assets/icon.png" alt="Rolig app icon" width="160" />
+  <a href="https://github.com/Taoyuan-AI-Lab/Rolig/blob/pre-release/frontend/assets/icon.png">
+    <img src="https://raw.githubusercontent.com/Taoyuan-AI-Lab/Rolig/pre-release/frontend/assets/icon.png" alt="Rolig app icon" width="160" />
+  </a>
 
   <h1>Rolig</h1>
 
@@ -12,8 +14,8 @@
   </p>
 
   <p>
-    <a href="https://devpost.com/software/rolig">
-      <img src="https://img.shields.io/badge/OpenAI_Build_Week-View_on_Devpost-003E54?style=for-the-badge" alt="View Rolig on Devpost" />
+    <a href="https://openai.devpost.com/">
+      <img src="https://img.shields.io/badge/OpenAI_Build_Week-View_Challenge-003E54?style=for-the-badge" alt="View the OpenAI Build Week Challenge" />
     </a>
   </p>
 
@@ -119,12 +121,12 @@ environment—never in Git.
 
 We welcome focused issues and pull requests.
 
-1. Create a short-lived branch from `pre-release`.
+1. Create a short-lived branch from `dev`.
 2. Keep frontend work in `frontend/` and backend work in `backend/`.
 3. Run the relevant TypeScript, Ruff, and pytest checks.
 4. Confirm that no `.env` files, credentials, or media binaries are staged.
-5. Open a pull request into `pre-release`; release changes move from
-   `pre-release` to `main`.
+5. Open every feature pull request into `dev`; release changes move through
+   `dev` → `pre-release` → `main`.
 
 Please review [SECURITY.md](SECURITY.md) before reporting a vulnerability or
 working with deployment configuration.
@@ -134,9 +136,9 @@ working with deployment configuration.
 Rolig was designed and built during OpenAI Build Week through a distributed,
 cross-time-zone collaboration:
 
-- **Shaun Lin** — cross-platform frontend, mobile engineering, and integration
-- **Sunny Yang** — product design, UI/UX, and meme interaction experience
-- **Roger Chen** — backend architecture, data infrastructure, and secure media pipeline
+- [Shaun Lin](https://github.com/ShaunLinTW)
+- [Tuo](https://github.com/tuo-miracle)
+- [Sunny Yang](https://github.com/SunnyYangUSA)
 
 Thank you to all three contributors for turning Rolig from an idea into a working
 cross-platform experience.
