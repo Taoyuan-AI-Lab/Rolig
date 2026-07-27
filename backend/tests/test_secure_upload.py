@@ -26,6 +26,7 @@ from app.media_pipeline import (
     validate_upload_declaration,
     verify_signature_bytes,
 )
+from app.repository import create_upload_session
 from app.schemas import MediaType
 from app.storage import R2Storage, StoredObject
 from app.upload_schemas import UploadCompleteRequest, UploadPresignRequest
@@ -350,6 +351,61 @@ async def test_presign_generates_opaque_server_key(monkeypatch) -> None:
     assert captured["content_length"] == 1024
     assert response.upload_id.startswith("upl_")
     assert response.headers == {"Content-Type": "video/mp4"}
+
+
+async def test_create_upload_session_uses_text_only_for_advisory_lock() -> None:
+    calls: list[tuple[str, tuple[object, ...]]] = []
+
+    class FakeTransaction:
+        async def __aenter__(self) -> None:
+            return None
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+    class FakeConnection:
+        def transaction(self) -> FakeTransaction:
+            return FakeTransaction()
+
+        async def execute(self, query: str, *args: object) -> None:
+            calls.append((query, args))
+
+        async def fetchval(self, query: str, *args: object) -> int:
+            calls.append((query, args))
+            return 0
+
+    class FakeAcquire:
+        async def __aenter__(self) -> FakeConnection:
+            return FakeConnection()
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+    class FakePool:
+        def acquire(self) -> FakeAcquire:
+            return FakeAcquire()
+
+    uploader_id = uuid4()
+    payload = UploadPresignRequest(
+        content_type="video/mp4",
+        file_name="demo.mp4",
+        media_type=MediaType.VIDEO,
+        size_bytes=1024,
+    )
+
+    await create_upload_session(
+        FakePool(),  # type: ignore[arg-type]
+        upload_id="upl_abcdefghijklmnopqrstuvwxyz",
+        uploader_id=uploader_id,
+        object_key="quarantine/uploads/object.mp4",
+        payload=payload,
+        expires_at=datetime.now(UTC) + timedelta(minutes=5),
+        quota_bytes=4096,
+    )
+
+    assert calls[0][1] == (str(uploader_id),)
+    assert calls[1][1] == (uploader_id,)
+    assert calls[2][1][1] == uploader_id
 
 
 async def test_presign_rejects_authenticated_user_outside_demo_allowlist() -> None:
