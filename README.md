@@ -109,7 +109,22 @@ uvicorn app.main:app --host 0.0.0.0 --port $PORT
 
 The committed `.python-version` keeps production on the tested Python 3.12 runtime.
 
+## Landing page
+
+The Next.js and Tailwind marketing site lives in `landing/`.
+
+```bash
+cd landing
+pnpm install
+pnpm dev
+```
+
+For Vercel, import this repository as a separate project and set the root
+directory to `landing`. Use the Next.js framework preset and `pre-release` as
+the production branch initially; switch the production branch to `main` when
+the landing page is ready for general release.
+
 ## Validation
 
-Run `npm run typecheck` in `frontend/` and `ruff check . && pytest -q` in
-`backend/` before opening a pull request.
+Run `npm run typecheck` in `frontend/`, `ruff check . && pytest -q` in
+`backend/`, and `pnpm build` in `landing/` before opening a pull request.
